@@ -82,6 +82,14 @@ const NAV: NavSection[] = [
 export default function Sidebar() {
   const pathname = usePathname();
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
   return (
     <aside
       className="flex flex-col h-screen w-64 shrink-0 border-r overflow-y-auto"
@@ -115,18 +123,18 @@ export default function Sidebar() {
       <div className="px-4 py-3">
         <div
           className="flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer group transition-all"
-          style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}
+          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}
         >
           <div className="flex items-center gap-2">
             <div
-              className="w-2 h-2 rounded-full animate-pulse-gold"
-              style={{ background: "var(--gold-400)" }}
+              className="w-2.5 h-2.5 rounded-full animate-pulse-gold"
+              style={{ background: "var(--gold-500)" }}
             />
-            <span className="text-sm font-medium" style={{ color: "var(--gold-400)" }}>
+            <span className="text-xs font-bold tracking-tight" style={{ color: "#92400e" }}>
               Sri Lakshmi Jewellers
             </span>
           </div>
-          <ChevronRight size={14} style={{ color: "var(--gold-500)" }} />
+          <ChevronRight size={14} style={{ color: "var(--gold-600)" }} />
         </div>
       </div>
 
@@ -171,25 +179,30 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="px-3 py-4 border-t" style={{ borderColor: "var(--border)" }}>
         <div
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group"
-          style={{ background: "var(--bg-card)" }}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl border"
+          style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}
         >
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-xs"
             style={{ background: "var(--gradient-gold)", color: "#fff" }}
           >
             A
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
+            <p className="text-xs font-bold truncate text-slate-800">
               Admin User
             </p>
-            <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+            <p className="text-[11px] truncate text-slate-500 font-medium">
               Shop Owner
             </p>
           </div>
-          <button className="btn-ghost p-1 rounded-lg">
-            <LogOut size={15} />
+          <button
+            onClick={handleLogout}
+            title="Log out"
+            className="btn-ghost p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800"
+            id="sidebar-logout-btn"
+          >
+            <LogOut size={14} />
           </button>
         </div>
       </div>

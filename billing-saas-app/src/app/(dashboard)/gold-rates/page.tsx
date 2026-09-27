@@ -1,89 +1,103 @@
-"use client";
-import { TrendingUp, Plus, Clock, ArrowUp, ArrowDown } from "lucide-react";
+import type { Metadata } from "next";
+import GoldRatesClient, { RateItem, RateHistoryItem } from "./GoldRatesClient";
+import prisma from "@/lib/prisma";
+import { getActiveTenantContext } from "@/lib/auth";
 
-const rates = [
-  { purity: "24K", rate: 6672, change: 48, pct: 0.72 },
-  { purity: "22K", rate: 6120, change: 44, pct: 0.72 },
-  { purity: "18K", rate: 5004, change: 36, pct: 0.72 },
-  { purity: "14K", rate: 3894, change: 28, pct: 0.72 },
-];
+export const metadata: Metadata = {
+  title: "Gold Rates",
+  description: "Live daily gold rates management and historical audit trail.",
+};
 
-const history = [
-  { date: "28 Aug 2026", "24K": 6672, "22K": 6120, updatedBy: "Admin", time: "09:00 AM" },
-  { date: "27 Aug 2026", "24K": 6624, "22K": 6076, updatedBy: "Admin", time: "09:15 AM" },
-  { date: "26 Aug 2026", "24K": 6588, "22K": 6043, updatedBy: "Manager", time: "09:00 AM" },
-  { date: "25 Aug 2026", "24K": 6600, "22K": 6055, updatedBy: "Admin", time: "08:45 AM" },
-  { date: "24 Aug 2026", "24K": 6540, "22K": 5996, updatedBy: "Admin", time: "09:30 AM" },
-];
+export default async function GoldRatesPage() {
+  const { tenantId } = await getActiveTenantContext();
 
-export default function GoldRatesPage() {
+  const [dbPurities, dbRates, dbMetals] = await Promise.all([
+    prisma.purity.findMany({
+      where: { tenantId },
+      orderBy: { fineness: "desc" },
+    }),
+    prisma.goldRate.findMany({
+      where: { tenantId },
+      include: { purity: true },
+      orderBy: { effectiveAt: "desc" },
+    }),
+    prisma.metal.findMany({
+      where: { tenantId },
+    }),
+  ]);
+
+  const defaultMetalId = dbMetals[0]?.id || "";
+
+  // Available purities with metalId
+  const availablePurities = dbPurities.map((p) => ({
+    id: p.id,
+    name: p.name,
+    fineness: Number(p.fineness),
+    metalId: p.metalId || defaultMetalId,
+  }));
+
+  // Find latest rate for each purity
+  const currentRates: RateItem[] = dbPurities.map((p) => {
+    const latest = dbRates.find((r) => r.purityId === p.id);
+    const rate = latest ? Number(latest.ratePerGram) : Math.round(Number(p.fineness) * 6672);
+    return {
+      purityId: p.id,
+      metalId: p.metalId || defaultMetalId,
+      purity: p.name,
+      fineness: Number(p.fineness),
+      rate,
+      change: 45,
+      pct: 0.72,
+    };
+  });
+
+  // History grouped by date
+  const historyMap = new Map<string, { rate24K: number; rate22K: number; updatedBy: string; time: string }>();
+
+  for (const r of dbRates) {
+    const d = new Date(r.effectiveAt);
+    const dateStr = new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(d);
+
+    const timeStr = new Intl.DateTimeFormat("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+
+    if (!historyMap.has(dateStr)) {
+      historyMap.set(dateStr, {
+        rate24K: 0,
+        rate22K: 0,
+        updatedBy: "Admin",
+        time: timeStr,
+      });
+    }
+
+    const entry = historyMap.get(dateStr)!;
+    if (r.purity?.name.includes("24") && entry.rate24K === 0) {
+      entry.rate24K = Number(r.ratePerGram);
+    } else if (r.purity?.name.includes("22") && entry.rate22K === 0) {
+      entry.rate22K = Number(r.ratePerGram);
+    }
+  }
+
+  const history: RateHistoryItem[] = Array.from(historyMap.entries()).map(([date, val]) => ({
+    date,
+    rate24K: val.rate24K || (val.rate22K ? Math.round(val.rate22K / 0.916) : 6672),
+    rate22K: val.rate22K || (val.rate24K ? Math.round(val.rate24K * 0.916) : 6120),
+    updatedBy: val.updatedBy,
+    time: val.time,
+  })).slice(0, 10);
+
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>
-            Gold Rates
-          </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            Manage daily gold rates by purity. Rate locked on invoice creation.
-          </p>
-        </div>
-        <button className="btn-gold" id="update-gold-rate-btn">
-          <Plus size={16} /> Update Rate
-        </button>
-      </div>
-
-      {/* Current Rates Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {rates.map((r, i) => (
-          <div
-            key={r.purity}
-            className={`stat-card animate-fade-up stagger-${i + 1}`}
-            style={{ boxShadow: "0 0 24px rgba(245,158,11,0.15)" }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="badge badge-gold">{r.purity}</span>
-              <span className="text-xs font-medium flex items-center gap-1" style={{ color: "#34d399" }}>
-                <ArrowUp size={12} /> {r.pct}%
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-gold mt-2" style={{ fontFamily: "var(--font-display)" }}>
-              ₹{r.rate.toLocaleString("en-IN")}
-            </p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>per gram · +₹{r.change} today</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Rate History */}
-      <div className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock size={16} style={{ color: "var(--text-muted)" }} />
-          <h2 className="section-title">Rate History</h2>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>24K Rate</th>
-              <th>22K Rate</th>
-              <th>Updated By</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((h) => (
-              <tr key={h.date}>
-                <td className="font-medium" style={{ color: "var(--text-primary)" }}>{h.date}</td>
-                <td className="font-semibold text-gold">₹{h["24K"].toLocaleString("en-IN")}</td>
-                <td className="font-semibold" style={{ color: "var(--text-secondary)" }}>₹{h["22K"].toLocaleString("en-IN")}</td>
-                <td style={{ color: "var(--text-secondary)" }}>{h.updatedBy}</td>
-                <td style={{ color: "var(--text-muted)" }}>{h.time}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <GoldRatesClient
+      currentRates={currentRates}
+      history={history}
+      availablePurities={availablePurities}
+    />
   );
 }

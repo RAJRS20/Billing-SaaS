@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculatePricing, calculateOldGold, derivePurityRate } from "../pricing";
+import { calculatePricing, calculateOldGold, derivePurityRate } from "../pricing.ts";
 
 test("derivePurityRate calculates 22K rate correctly from 24K rate", () => {
   const rate24K = 6000;
