@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { recordOldGoldAction } from "@/app/actions/old-gold";
 import { OldGoldType } from "@prisma/client";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -295,49 +297,40 @@ export default function OldGoldClient({
       </div>
 
       {/* Slide-over Detail Panel */}
-      {selectedRecord && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedRecord(null)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto animate-scale-in bg-white border-l border-slate-200 shadow-2xl">
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-white">
-              <div>
-                <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)" }}>
-                  Old Gold Valuation Details
-                </h3>
-                <p className="text-xs font-bold text-amber-800 mt-0.5">{selectedRecord.id.slice(-8).toUpperCase()}</p>
-              </div>
-              <button className="btn-ghost p-2" onClick={() => setSelectedRecord(null)}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Customer", value: selectedRecord.customer },
-                  { label: "Phone", value: selectedRecord.phone },
-                  { label: "Date", value: selectedRecord.date },
-                  { label: "Type", value: selectedRecord.type },
-                  { label: "Tested Fineness", value: `${(selectedRecord.testedFineness * 100).toFixed(2)}%` },
-                  { label: "Pure Gold Equiv", value: `${selectedRecord.pureGoldEquiv.toFixed(3)}g` },
-                  { label: "Buying Rate", value: `₹${selectedRecord.buyingRate}/g` },
-                  { label: "Valuation", value: fmt(selectedRecord.valuationAmount) },
-                ].map((d) => (
-                  <div key={d.label} className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
-                  </div>
-                ))}
-              </div>
-              {selectedRecord.notes && (
-                <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Notes</p>
-                  <p className="text-xs font-medium text-slate-600">{selectedRecord.notes}</p>
+      <SlideOver
+        isOpen={!!selectedRecord}
+        onClose={() => setSelectedRecord(null)}
+        title="Old Gold Valuation Details"
+        subtitle={selectedRecord ? selectedRecord.id.slice(-8).toUpperCase() : ""}
+      >
+        {selectedRecord && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Customer", value: selectedRecord.customer },
+                { label: "Phone", value: selectedRecord.phone },
+                { label: "Date", value: selectedRecord.date },
+                { label: "Type", value: selectedRecord.type },
+                { label: "Tested Fineness", value: `${(selectedRecord.testedFineness * 100).toFixed(2)}%` },
+                { label: "Pure Gold Equiv", value: `${selectedRecord.pureGoldEquiv.toFixed(3)}g` },
+                { label: "Buying Rate", value: `₹${selectedRecord.buyingRate}/g` },
+                { label: "Valuation", value: fmt(selectedRecord.valuationAmount) },
+              ].map((d) => (
+                <div key={d.label} className="rounded-xl p-3 border bg-slate-50 border-slate-200">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
                 </div>
-              )}
+              ))}
             </div>
+            {selectedRecord.notes && (
+              <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Notes</p>
+                <p className="text-xs font-medium text-slate-600">{selectedRecord.notes}</p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* New Old Gold Modal */}
       {showNewModal && (
@@ -441,20 +434,14 @@ function NewOldGoldModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-          <div className="flex items-center gap-2">
-            <Scale size={18} className="text-amber-700" />
-            <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-              New Old Gold Assaying & Valuation
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="New Old Gold Assaying & Valuation"
+      icon={<Scale size={18} className="text-amber-700" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="input-label">Transaction Mode</label>
             <div className="grid grid-cols-2 gap-2">
@@ -638,7 +625,6 @@ function NewOldGoldModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

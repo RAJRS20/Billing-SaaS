@@ -124,7 +124,36 @@ export async function createEstimateAction(input: CreateEstimateInput) {
 
     revalidatePath("/estimates");
 
-    return { success: true, estimate };
+    return {
+      success: true,
+      estimate: {
+        id: estimate.id,
+        estimateNumber: estimate.estimateNumber,
+        estimateDate: estimate.estimateDate.toISOString(),
+        expiryDate: estimate.expiryDate ? estimate.expiryDate.toISOString() : null,
+        customer: estimate.customer
+          ? { id: estimate.customer.id, name: estimate.customer.name, phone: estimate.customer.phone }
+          : null,
+        items: estimate.items.map((i) => ({
+          id: i.id,
+          productName: i.productName,
+          grossWeight: Number(i.grossWeight),
+          netWeight: Number(i.netWeight),
+          goldRatePerGram: Number(i.goldRatePerGram),
+          goldValue: Number(i.goldValue),
+          makingCharge: Number(i.makingCharge),
+          stoneCharge: Number(i.stoneCharge),
+          quantity: i.quantity,
+          totalAmount: Number(i.totalAmount),
+        })),
+        grossAmount: Number(estimate.grossAmount),
+        discountAmount: Number(estimate.discountAmount),
+        taxAmount: Number(estimate.taxAmount),
+        netAmount: Number(estimate.netAmount),
+        status: estimate.status,
+        notes: estimate.notes || "",
+      },
+    };
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to create estimate." };
   }
@@ -150,7 +179,14 @@ export async function updateEstimateStatusAction(estimateId: string, status: Est
     });
 
     revalidatePath("/estimates");
-    return { success: true, estimate: updated };
+    return {
+      success: true,
+      estimate: {
+        id: updated.id,
+        status: updated.status,
+        netAmount: Number(updated.netAmount),
+      },
+    };
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to update estimate status." };
   }

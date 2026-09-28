@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, ChevronDown, X, Check, Eye,
   Truck, Package, Scale, IndianRupee, Calendar,
@@ -13,6 +14,8 @@ import {
   recordSupplierPaymentAction,
 } from "@/app/actions/purchases";
 import { PaymentMethod } from "@prisma/client";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +97,11 @@ export default function PurchasesClient({
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseData | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     return purchases.filter((p) => {
@@ -330,131 +338,112 @@ export default function PurchasesClient({
       </div>
 
       {/* Purchase Detail Panel */}
-      {selectedPurchase && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          <div
-            className="absolute inset-0"
-            style={{ background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)" }}
-            onClick={() => setSelectedPurchase(null)}
-          />
-          <div
-            className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto animate-scale-in"
-            style={{
-              background: "var(--bg-surface)",
-              borderLeft: "1px solid var(--border)",
-              boxShadow: "-20px 0 60px rgba(15, 23, 42, 0.12)",
-            }}
-          >
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-              <div>
-                <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>
-                  Purchase Details
-                </h3>
-                <p className="text-xs font-bold mt-0.5" style={{ color: "#b45309" }}>{selectedPurchase.purchaseNumber}</p>
-              </div>
-              <button className="btn-ghost p-2" onClick={() => setSelectedPurchase(null)}>
-                <X size={18} />
-              </button>
+      <SlideOver
+        isOpen={!!selectedPurchase}
+        onClose={() => setSelectedPurchase(null)}
+        title="Purchase Details"
+        subtitle={selectedPurchase?.purchaseNumber}
+        maxWidth="max-w-xl"
+      >
+        {selectedPurchase && (
+          <div className="space-y-6">
+            {/* Summary */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Date", value: selectedPurchase.purchaseDate },
+                { label: "Supplier", value: selectedPurchase.supplier },
+                { label: "Branch", value: selectedPurchase.branch },
+                { label: "Status", value: STATUS_CONFIG[selectedPurchase.status].label },
+              ].map((d) => (
+                <div key={d.label} className="rounded-xl p-3 border" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
+                </div>
+              ))}
             </div>
-            <div className="p-6 space-y-6">
-              {/* Summary */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Date", value: selectedPurchase.purchaseDate },
-                  { label: "Supplier", value: selectedPurchase.supplier },
-                  { label: "Branch", value: selectedPurchase.branch },
-                  { label: "Status", value: STATUS_CONFIG[selectedPurchase.status].label },
-                ].map((d) => (
-                  <div key={d.label} className="rounded-xl p-3 border" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
+
+            {/* Items */}
+            <div>
+              <h4 className="section-title mb-3 flex items-center gap-2">
+                <Package size={16} style={{ color: "var(--gold-500)" }} />
+                Purchase Items & Inward Weights
+              </h4>
+              <div className="space-y-2">
+                {selectedPurchase.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl border flex items-center justify-between"
+                    style={{ borderColor: "#e2e8f0" }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-800">{item.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="badge badge-info text-[10px]">{item.sku}</span>
+                        {item.purity !== "N/A" && <span className="badge badge-gold text-[10px]">{item.purity}</span>}
+                      </div>
+                      <div className="flex gap-4 mt-1.5 text-[10px] text-slate-400">
+                        <span>Qty: <strong className="text-slate-600">{item.quantity}</strong></span>
+                        <span>Gross: <strong className="text-slate-600">{item.grossWeight.toFixed(1)}g</strong></span>
+                        <span>Net: <strong className="text-slate-600">{item.netWeight.toFixed(1)}g</strong></span>
+                        {item.ratePerGram > 0 && <span>Rate: <strong className="text-slate-600">₹{item.ratePerGram}/g</strong></span>}
+                      </div>
+                    </div>
+                    <p className="text-sm font-bold text-gold shrink-0 ml-3">{fmt(item.totalCost)}</p>
                   </div>
                 ))}
               </div>
-
-              {/* Items */}
-              <div>
-                <h4 className="section-title mb-3 flex items-center gap-2">
-                  <Package size={16} style={{ color: "var(--gold-500)" }} />
-                  Purchase Items & Inward Weights
-                </h4>
-                <div className="space-y-2">
-                  {selectedPurchase.items.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl border flex items-center justify-between"
-                      style={{ borderColor: "#e2e8f0" }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-slate-800">{item.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="badge badge-info text-[10px]">{item.sku}</span>
-                          {item.purity !== "N/A" && <span className="badge badge-gold text-[10px]">{item.purity}</span>}
-                        </div>
-                        <div className="flex gap-4 mt-1.5 text-[10px] text-slate-400">
-                          <span>Qty: <strong className="text-slate-600">{item.quantity}</strong></span>
-                          <span>Gross: <strong className="text-slate-600">{item.grossWeight.toFixed(1)}g</strong></span>
-                          <span>Net: <strong className="text-slate-600">{item.netWeight.toFixed(1)}g</strong></span>
-                          {item.ratePerGram > 0 && <span>Rate: <strong className="text-slate-600">₹{item.ratePerGram}/g</strong></span>}
-                        </div>
-                      </div>
-                      <p className="text-sm font-bold text-gold shrink-0 ml-3">{fmt(item.totalCost)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payment Summary */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="section-title flex items-center gap-2">
-                    <IndianRupee size={16} style={{ color: "var(--gold-500)" }} />
-                    Payables & Settlement
-                  </h4>
-                  {selectedPurchase.amountDue > 0 && (
-                    <button
-                      className="btn-gold text-xs py-1 px-3"
-                      onClick={() => setShowPaymentModal(true)}
-                    >
-                      <CreditCard size={13} /> Pay Supplier
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2 rounded-xl border p-4" style={{ borderColor: "#e2e8f0" }}>
-                  {[
-                    { label: "Gross Amount", value: fmt(selectedPurchase.grossAmount) },
-                    { label: "Tax (3% GST)", value: fmt(selectedPurchase.taxAmount) },
-                    { label: "Net Payable", value: fmt(selectedPurchase.netAmount), bold: true },
-                    { label: "Amount Paid", value: fmt(selectedPurchase.amountPaid), color: "#059669" },
-                    { label: "Amount Due", value: fmt(selectedPurchase.amountDue), color: selectedPurchase.amountDue > 0 ? "#dc2626" : "#059669" },
-                  ].map((row) => (
-                    <div key={row.label} className={`flex justify-between items-center ${row.bold ? "pt-2 border-t border-slate-100" : ""}`}>
-                      <span className={`text-xs ${row.bold ? "font-bold text-slate-800" : "text-slate-500 font-medium"}`}>{row.label}</span>
-                      <span
-                        className={`text-sm ${row.bold ? "font-extrabold" : "font-bold"}`}
-                        style={{ color: row.color || "var(--text-primary)", fontFamily: row.bold ? "var(--font-display)" : undefined }}
-                      >
-                        {row.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Notes */}
-              {selectedPurchase.notes && (
-                <div className="rounded-xl p-3 border" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Notes & References</p>
-                  <p className="text-xs text-slate-600 font-medium">{selectedPurchase.notes}</p>
-                </div>
-              )}
             </div>
+
+            {/* Payment Summary */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="section-title flex items-center gap-2">
+                  <IndianRupee size={16} style={{ color: "var(--gold-500)" }} />
+                  Payables & Settlement
+                </h4>
+                {selectedPurchase.amountDue > 0 && (
+                  <button
+                    className="btn-gold text-xs py-1 px-3"
+                    onClick={() => setShowPaymentModal(true)}
+                  >
+                    <CreditCard size={13} /> Pay Supplier
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2 rounded-xl border p-4" style={{ borderColor: "#e2e8f0" }}>
+                {[
+                  { label: "Gross Amount", value: fmt(selectedPurchase.grossAmount) },
+                  { label: "Tax (3% GST)", value: fmt(selectedPurchase.taxAmount) },
+                  { label: "Net Payable", value: fmt(selectedPurchase.netAmount), bold: true },
+                  { label: "Amount Paid", value: fmt(selectedPurchase.amountPaid), color: "#059669" },
+                  { label: "Amount Due", value: fmt(selectedPurchase.amountDue), color: selectedPurchase.amountDue > 0 ? "#dc2626" : "#059669" },
+                ].map((row) => (
+                  <div key={row.label} className={`flex justify-between items-center ${row.bold ? "pt-2 border-t border-slate-100" : ""}`}>
+                    <span className={`text-xs ${row.bold ? "font-bold text-slate-800" : "text-slate-500 font-medium"}`}>{row.label}</span>
+                    <span
+                      className={`text-sm ${row.bold ? "font-extrabold" : "font-bold"}`}
+                      style={{ color: row.color || "var(--text-primary)", fontFamily: row.bold ? "var(--font-display)" : undefined }}
+                    >
+                      {row.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Notes */}
+            {selectedPurchase.notes && (
+              <div className="rounded-xl p-3 border" style={{ background: "#f8fafc", borderColor: "#e2e8f0" }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Notes & References</p>
+                <p className="text-xs text-slate-600 font-medium">{selectedPurchase.notes}</p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* New Purchase Modal */}
-      {showNewModal && (
+      {mounted && showNewModal && (
         <NewPurchaseModal
           suppliers={suppliers}
           products={products}
@@ -464,7 +453,7 @@ export default function PurchasesClient({
       )}
 
       {/* Supplier Payment Modal */}
-      {showPaymentModal && selectedPurchase && (
+      {mounted && showPaymentModal && selectedPurchase && (
         <SupplierPaymentModal
           purchase={selectedPurchase}
           onClose={() => setShowPaymentModal(false)}
@@ -589,20 +578,14 @@ function NewPurchaseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-          <div className="flex items-center gap-2">
-            <Truck size={18} className="text-amber-700" />
-            <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-              New Purchase Inward (Goods Receipt)
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="New Purchase Inward (Goods Receipt)"
+      icon={<Truck size={18} className="text-amber-700" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="input-label">Supplier *</label>
             <select
@@ -766,8 +749,7 @@ function NewPurchaseModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -820,20 +802,16 @@ function SupplierPaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in">
-        <div className="px-6 py-4 flex items-center justify-between border-b bg-emerald-50/60 border-emerald-200">
-          <div className="flex items-center gap-2">
-            <CreditCard size={18} className="text-emerald-700" />
-            <h3 className="font-bold text-sm text-emerald-900" style={{ fontFamily: "var(--font-display)" }}>
-              Pay Supplier
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handlePay} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Pay Supplier"
+      icon={<CreditCard size={18} className="text-emerald-700" />}
+      maxWidth="max-w-sm"
+      headerBg="bg-emerald-50/70"
+      headerBorder="border-emerald-200"
+    >
+      <form onSubmit={handlePay} className="space-y-4">
           <div>
             <p className="text-xs text-slate-500 font-medium">Paying Supplier:</p>
             <p className="text-sm font-bold text-slate-800">{purchase.supplier}</p>
@@ -893,7 +871,6 @@ function SupplierPaymentModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

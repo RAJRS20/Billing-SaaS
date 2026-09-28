@@ -34,6 +34,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { recordStockAdjustmentAction } from "@/app/actions/inventory";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -978,34 +980,14 @@ export default function InventoryClient({
       )}
 
       {/* ─── Product Detail Slide-over Panel ─────────────────────── */}
-      {showDetailPanel && selectedProduct && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 transition-opacity"
-            style={{ background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)" }}
-            onClick={() => setShowDetailPanel(false)}
-          />
-
-          {/* Panel */}
-          <div
-            className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto animate-scale-in"
-            style={{
-              background: "var(--bg-surface)",
-              borderLeft: "1px solid var(--border)",
-              boxShadow: "-20px 0 60px rgba(15, 23, 42, 0.12)",
-            }}
-          >
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-              <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>
-                Product Details
-              </h3>
-              <button className="btn-ghost p-2" onClick={() => setShowDetailPanel(false)} id="inventory-detail-close">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
+      <SlideOver
+        isOpen={showDetailPanel && !!selectedProduct}
+        onClose={() => setShowDetailPanel(false)}
+        title="Product Details"
+        subtitle={selectedProduct ? `${selectedProduct.sku} · ${selectedProduct.name}` : ""}
+      >
+        {selectedProduct && (
+          <div className="space-y-6">
               {/* Product header */}
               <div className="flex items-start gap-4">
                 <div
@@ -1106,9 +1088,8 @@ export default function InventoryClient({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* ─── Stock Adjustment Modal ──────────────────────────────── */}
       {showAdjustModal && (
@@ -1177,40 +1158,15 @@ function StockAdjustmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "rgba(15, 23, 42, 0.5)", backdropFilter: "blur(6px)" }}
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div
-        className="relative w-full max-w-md mx-4 animate-scale-in card p-0 overflow-hidden"
-        style={{ boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}
-      >
-        {/* Header */}
-        <div
-          className="px-6 py-4 flex items-center justify-between border-b"
-          style={{ background: "#fffbeb", borderColor: "#fde68a" }}
-        >
-          <div className="flex items-center gap-2">
-            <ClipboardList size={18} style={{ color: "#b45309" }} />
-            <h3
-              className="font-bold text-sm"
-              style={{ color: "#78350f", fontFamily: "var(--font-display)" }}
-            >
-              New Stock Adjustment
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}>
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="New Stock Adjustment"
+      icon={<ClipboardList size={18} style={{ color: "#b45309" }} />}
+      maxWidth="max-w-md"
+    >
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="input-label">Select Product</label>
             <div className="relative">
@@ -1377,7 +1333,6 @@ function StockAdjustmentModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Modal>
   );
 }

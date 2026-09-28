@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, Filter, Gem, Eye, Printer, QrCode,
   Tag, ArrowUpDown, Check, X, ShieldCheck, Sparkles,
   Layers, Scale, IndianRupee, Image as ImageIcon, ChevronRight
 } from "lucide-react";
 import { createProductAction } from "@/app/actions/products";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 export interface ProductItem {
   id: string;
@@ -53,6 +56,11 @@ export default function ProductsClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [tagPrinted, setTagPrinted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // New product form
   const [newProd, setNewProd] = useState({
@@ -452,24 +460,17 @@ export default function ProductsClient({
       </div>
 
       {/* ─── JEWELLERY BARCODE TAG MODAL ────────────────────────────────────── */}
-      {tagModalProduct && (
-        <div className="modal-backdrop" onClick={() => setTagModalProduct(null)}>
-          <div
-            className="modal-box max-w-sm p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <Tag className="text-amber-600" size={18} />
-                <h3 className="font-bold text-sm text-slate-900">Jewellery Barcode Tag Preview</h3>
-              </div>
-              <button onClick={() => setTagModalProduct(null)} className="text-slate-400 hover:text-slate-600">
-                ✕
-              </button>
-            </div>
-
+      <Modal
+        isOpen={!!tagModalProduct}
+        onClose={() => setTagModalProduct(null)}
+        title="Jewellery Barcode Tag Preview"
+        icon={<Tag className="text-amber-600" size={18} />}
+        maxWidth="max-w-sm"
+      >
+        {tagModalProduct && (
+          <div className="space-y-4">
             {/* Tag visual rendering */}
-            <div className="my-5 p-4 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/40 text-center space-y-2">
+            <div className="p-4 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/40 text-center space-y-2">
               <div className="text-[10px] uppercase font-bold tracking-widest text-amber-900">
                 SRI LAKSHMI JEWELLERS
               </div>
@@ -519,12 +520,12 @@ export default function ProductsClient({
             </div>
 
             {tagPrinted && (
-              <div className="p-2 mb-3 bg-emerald-50 text-emerald-800 text-xs rounded-lg text-center font-bold">
+              <div className="p-2 bg-emerald-50 text-emerald-800 text-xs rounded-lg text-center font-bold">
                 Tag sent to printer spooler!
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setTagModalProduct(null)} className="btn-outline text-xs px-3">
                 Cancel
               </button>
@@ -533,33 +534,24 @@ export default function ProductsClient({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* ─── ADD PRODUCT MODAL ──────────────────────────────────────────────── */}
-      {showAddModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div
-            className="modal-box max-w-lg p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <Plus className="text-amber-600" size={18} />
-                <h3 className="font-bold text-base text-slate-900">Add New Jewellery Item</h3>
-              </div>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
-                ✕
-              </button>
-            </div>
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add New Jewellery Item"
+        icon={<Plus className="text-amber-600" size={18} />}
+        maxWidth="max-w-lg"
+      >
+        {errorMsg && (
+          <div className="mb-3 p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
+            {errorMsg}
+          </div>
+        )}
 
-            {errorMsg && (
-              <div className="mt-3 p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateProduct} className="space-y-3 mt-4 text-xs">
+        <form onSubmit={handleCreateProduct} className="space-y-3 text-xs">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Product Article Name *</label>
                 <input
@@ -682,84 +674,72 @@ export default function ProductsClient({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* ─── PRODUCT DETAIL MODAL ────────────────────────────────────────────── */}
-      {selectedProduct && (
-        <div className="modal-backdrop" onClick={() => setSelectedProduct(null)}>
-          <div
-            className="modal-box max-w-md p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+      {/* ─── PRODUCT DETAIL SLIDE-OVER ────────────────────────────────────────── */}
+      <SlideOver
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        title="Product Details"
+        subtitle={selectedProduct ? `${selectedProduct.sku} · ${selectedProduct.name}` : ""}
+      >
+        {selectedProduct && (
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border">
               <div>
-                <h3 className="font-bold text-sm text-slate-900">{selectedProduct.name}</h3>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.5">SKU: {selectedProduct.sku}</p>
+                <span className="text-slate-400 block text-[10px]">Category</span>
+                <span className="font-bold text-slate-800">{selectedProduct.category}</span>
               </div>
-              <button onClick={() => setSelectedProduct(null)} className="text-slate-400 hover:text-slate-600">
-                ✕
+              <div>
+                <span className="text-slate-400 block text-[10px]">Metal & Purity</span>
+                <span className="font-bold text-slate-800">{selectedProduct.metal} ({selectedProduct.purity})</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">HUID (Hallmark)</span>
+                <span className="font-bold font-mono text-amber-700">{selectedProduct.huid || "—"}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Current Stock</span>
+                <span className="font-bold text-emerald-700">{selectedProduct.stockQty} pieces</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center p-3 border rounded-xl">
+              <div>
+                <span className="text-slate-400 block text-[10px]">Gross Wt</span>
+                <span className="font-bold text-slate-800">{selectedProduct.grossWeight.toFixed(2)}g</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Stone Wt</span>
+                <span className="font-bold text-slate-800">{selectedProduct.stoneWeight.toFixed(2)}g</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Net Wt</span>
+                <span className="font-bold text-amber-800">{selectedProduct.netWeight.toFixed(2)}g</span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center p-3 bg-amber-50 rounded-xl border border-amber-200">
+              <div>
+                <span className="text-amber-700 block text-[10px] font-semibold">Estimated Valuation</span>
+                <span className="text-base font-bold text-amber-950">
+                  ₹{selectedProduct.approxPrice.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const p = selectedProduct;
+                  setSelectedProduct(null);
+                  setTagModalProduct(p);
+                }}
+                className="btn-gold text-xs px-3 py-1.5"
+              >
+                <Tag size={13} /> View Tag
               </button>
             </div>
-
-            <div className="space-y-4 mt-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Category</span>
-                  <span className="font-bold text-slate-800">{selectedProduct.category}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Metal & Purity</span>
-                  <span className="font-bold text-slate-800">{selectedProduct.metal} ({selectedProduct.purity})</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">HUID (Hallmark)</span>
-                  <span className="font-bold font-mono text-amber-700">{selectedProduct.huid || "—"}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Current Stock</span>
-                  <span className="font-bold text-emerald-700">{selectedProduct.stockQty} pieces</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center p-3 border rounded-xl">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Gross Wt</span>
-                  <span className="font-bold text-slate-800">{selectedProduct.grossWeight.toFixed(2)}g</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Stone Wt</span>
-                  <span className="font-bold text-slate-800">{selectedProduct.stoneWeight.toFixed(2)}g</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Net Wt</span>
-                  <span className="font-bold text-amber-800">{selectedProduct.netWeight.toFixed(2)}g</span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center p-3 bg-amber-50 rounded-xl border border-amber-200">
-                <div>
-                  <span className="text-amber-700 block text-[10px] font-semibold">Estimated Valuation</span>
-                  <span className="text-base font-bold text-amber-950">
-                    ₹{selectedProduct.approxPrice.toLocaleString("en-IN")}
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    const p = selectedProduct;
-                    setSelectedProduct(null);
-                    setTagModalProduct(p);
-                  }}
-                  className="btn-gold text-xs px-3 py-1.5"
-                >
-                  <Tag size={13} /> View Tag
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
     </div>
   );
 }

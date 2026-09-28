@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, ChevronDown, X, Check, Phone, Mail, MapPin,
   Users, IndianRupee, ShoppingCart, Wallet, ArrowUpRight,
@@ -8,6 +9,8 @@ import {
   RefreshCw, Scale, Eye, Calendar, AlertCircle,
 } from "lucide-react";
 import { createCustomerAction } from "@/app/actions/customers";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +62,11 @@ export default function CustomersClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerData | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     return customers.filter((c) => {
@@ -251,85 +259,76 @@ export default function CustomersClient({
       </div>
 
       {/* Slide-over Detail Panel */}
-      {selectedCustomer && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedCustomer(null)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto animate-scale-in bg-white border-l border-slate-200 shadow-2xl">
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-white">
-              <div>
-                <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)" }}>
-                  {selectedCustomer.name}
-                </h3>
-                <p className="text-xs font-medium text-slate-400 mt-0.5">{selectedCustomer.phone}</p>
+      <SlideOver
+        isOpen={!!selectedCustomer}
+        onClose={() => setSelectedCustomer(null)}
+        title={selectedCustomer?.name}
+        subtitle={selectedCustomer?.phone}
+      >
+        {selectedCustomer && (
+          <div className="space-y-6">
+            {/* Receivable Ledger */}
+            <div>
+              <h4 className="section-title mb-3 flex items-center gap-2">
+                <IndianRupee size={16} style={{ color: "var(--gold-500)" }} />
+                Receivable Ledger & Balances
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Lifetime Value", value: fmt(selectedCustomer.lifetimeValue), color: "#4f46e5" },
+                  { label: "Total Settled", value: fmt(selectedCustomer.totalPaid), color: "#059669" },
+                  { label: "Outstanding Due", value: fmt(selectedCustomer.outstanding), color: selectedCustomer.outstanding > 0 ? "#dc2626" : "#059669" },
+                  { label: "Advance Balance", value: fmt(selectedCustomer.advanceBalance), color: "#0369a1" },
+                  { label: "Old Gold Exchanged", value: fmt(selectedCustomer.oldGoldValue), color: "#b45309" },
+                  { label: "Active Custom Orders", value: selectedCustomer.ordersActive.toString(), color: "#7c3aed" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl p-3 border text-center border-slate-200">
+                    <p className="text-base font-extrabold" style={{ color: item.color, fontFamily: "var(--font-display)" }}>{item.value}</p>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">{item.label}</p>
+                  </div>
+                ))}
               </div>
-              <button className="btn-ghost p-2" onClick={() => setSelectedCustomer(null)}>
-                <X size={18} />
-              </button>
             </div>
-            <div className="p-6 space-y-6">
-              {/* Receivable Ledger */}
-              <div>
-                <h4 className="section-title mb-3 flex items-center gap-2">
-                  <IndianRupee size={16} style={{ color: "var(--gold-500)" }} />
-                  Receivable Ledger & Balances
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "Lifetime Value", value: fmt(selectedCustomer.lifetimeValue), color: "#4f46e5" },
-                    { label: "Total Settled", value: fmt(selectedCustomer.totalPaid), color: "#059669" },
-                    { label: "Outstanding Due", value: fmt(selectedCustomer.outstanding), color: selectedCustomer.outstanding > 0 ? "#dc2626" : "#059669" },
-                    { label: "Advance Balance", value: fmt(selectedCustomer.advanceBalance), color: "#0369a1" },
-                    { label: "Old Gold Exchanged", value: fmt(selectedCustomer.oldGoldValue), color: "#b45309" },
-                    { label: "Active Custom Orders", value: selectedCustomer.ordersActive.toString(), color: "#7c3aed" },
-                  ].map((item) => (
-                    <div key={item.label} className="rounded-xl p-3 border text-center border-slate-200">
-                      <p className="text-base font-extrabold" style={{ color: item.color, fontFamily: "var(--font-display)" }}>{item.value}</p>
-                      <p className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5">{item.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Transactions */}
-              <div>
-                <h4 className="section-title mb-3 flex items-center gap-2">
-                  <Clock size={16} style={{ color: "var(--gold-500)" }} />
-                  Activity Timeline
-                </h4>
-                <div className="space-y-2">
-                  {selectedCustomer.transactions.map((t, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200">
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                        style={{
-                          background: t.type.includes("SALE") ? "#eef2ff" : t.type.includes("ADVANCE") ? "#ecfdf5" : "#fffbeb",
-                          color: t.type.includes("SALE") ? "#4f46e5" : t.type.includes("ADVANCE") ? "#059669" : "#b45309",
-                        }}
-                      >
-                        {t.type.includes("SALE") ? <ShoppingCart size={14} /> : t.type.includes("ADVANCE") ? <Wallet size={14} /> : <FileText size={14} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-slate-800">{t.type.replace(/_/g, " ")}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">{t.ref}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-slate-900">{fmt(t.amount)}</p>
-                        <p className="text-[10px] text-slate-400">{t.date}</p>
-                      </div>
+            {/* Transactions */}
+            <div>
+              <h4 className="section-title mb-3 flex items-center gap-2">
+                <Clock size={16} style={{ color: "var(--gold-500)" }} />
+                Activity Timeline
+              </h4>
+              <div className="space-y-2">
+                {selectedCustomer.transactions.map((t, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{
+                        background: t.type.includes("SALE") ? "#eef2ff" : t.type.includes("ADVANCE") ? "#ecfdf5" : "#fffbeb",
+                        color: t.type.includes("SALE") ? "#4f46e5" : t.type.includes("ADVANCE") ? "#059669" : "#b45309",
+                      }}
+                    >
+                      {t.type.includes("SALE") ? <ShoppingCart size={14} /> : t.type.includes("ADVANCE") ? <Wallet size={14} /> : <FileText size={14} />}
                     </div>
-                  ))}
-                  {selectedCustomer.transactions.length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-4">No transactions recorded yet</p>
-                  )}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-800">{t.type.replace(/_/g, " ")}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{t.ref}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-slate-900">{fmt(t.amount)}</p>
+                      <p className="text-[10px] text-slate-400">{t.date}</p>
+                    </div>
+                  </div>
+                ))}
+                {selectedCustomer.transactions.length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-4">No transactions recorded yet</p>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* Add Customer Modal */}
-      {showAddModal && (
+      {mounted && showAddModal && (
         <AddCustomerModal
           onClose={() => setShowAddModal(false)}
           onSuccess={handleCustomerAdded}
@@ -414,20 +413,14 @@ function AddCustomerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-          <div className="flex items-center gap-2">
-            <Users size={18} className="text-amber-700" />
-            <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-              Add New Customer Profile
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add New Customer Profile"
+      icon={<Users size={18} className="text-amber-700" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="input-label">Full Name *</label>
@@ -514,7 +507,6 @@ function AddCustomerModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, ChevronDown, X, Check, Eye,
   RefreshCw, ArrowRightLeft, IndianRupee,
@@ -11,6 +12,8 @@ import {
   lookupSaleForReturnAction,
   processSaleReturnAction,
 } from "@/app/actions/returns";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +70,11 @@ export default function ReturnsClient({
   const [typeFilter, setTypeFilter] = useState<ReturnType | "ALL">("ALL");
   const [selectedReturn, setSelectedReturn] = useState<ReturnRecord | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     return returns.filter((r) => {
@@ -278,62 +286,57 @@ export default function ReturnsClient({
       </div>
 
       {/* Slide-over Detail Panel */}
-      {selectedReturn && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedReturn(null)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto animate-scale-in bg-white border-l border-slate-200 shadow-2xl">
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-white">
-              <div>
-                <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)" }}>Return Details</h3>
-                <p className="text-xs font-bold text-amber-800 mt-0.5">{selectedReturn.returnNumber}</p>
-              </div>
-              <button className="btn-ghost p-2" onClick={() => setSelectedReturn(null)}><X size={18} /></button>
+      <SlideOver
+        isOpen={!!selectedReturn}
+        onClose={() => setSelectedReturn(null)}
+        title="Return Details"
+        subtitle={selectedReturn?.returnNumber}
+      >
+        {selectedReturn && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Type", value: selectedReturn.type },
+                { label: "Date", value: selectedReturn.date },
+                { label: "Customer", value: selectedReturn.customer },
+                { label: "Original Invoice", value: selectedReturn.originalInvoice },
+                { label: "Returned Item", value: selectedReturn.returnedItem },
+                { label: "Returned Weight", value: `${selectedReturn.returnedWeight.toFixed(3)}g (${selectedReturn.returnedPurity})` },
+                { label: "Status", value: STATUS_CONFIG[selectedReturn.status]?.label || selectedReturn.status },
+                { label: "Approved By", value: selectedReturn.approvedBy || "Manager" },
+              ].map((d) => (
+                <div key={d.label} className="rounded-xl p-3 border bg-slate-50 border-slate-200">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
+                </div>
+              ))}
             </div>
-            <div className="p-6 space-y-6">
+            {selectedReturn.refundAmount > 0 && (
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Type", value: selectedReturn.type },
-                  { label: "Date", value: selectedReturn.date },
-                  { label: "Customer", value: selectedReturn.customer },
-                  { label: "Original Invoice", value: selectedReturn.originalInvoice },
-                  { label: "Returned Item", value: selectedReturn.returnedItem },
-                  { label: "Returned Weight", value: `${selectedReturn.returnedWeight.toFixed(3)}g (${selectedReturn.returnedPurity})` },
-                  { label: "Status", value: STATUS_CONFIG[selectedReturn.status]?.label || selectedReturn.status },
-                  { label: "Approved By", value: selectedReturn.approvedBy || "Manager" },
-                ].map((d) => (
-                  <div key={d.label} className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
-                  </div>
-                ))}
-              </div>
-              {selectedReturn.refundAmount > 0 && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl p-3 border bg-red-50 border-red-200">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-red-600">Refund Amount</p>
-                    <p className="text-lg font-extrabold text-red-700" style={{ fontFamily: "var(--font-display)" }}>
-                      {fmt(selectedReturn.refundAmount)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Refund Method</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{selectedReturn.refundMethod}</p>
-                  </div>
+                <div className="rounded-xl p-3 border bg-red-50 border-red-200">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-red-600">Refund Amount</p>
+                  <p className="text-lg font-extrabold text-red-700" style={{ fontFamily: "var(--font-display)" }}>
+                    {fmt(selectedReturn.refundAmount)}
+                  </p>
                 </div>
-              )}
-              {selectedReturn.inspectionNotes && (
                 <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Inspection Notes</p>
-                  <p className="text-xs font-medium text-slate-600">{selectedReturn.inspectionNotes}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Refund Method</p>
+                  <p className="text-sm font-bold text-slate-800 mt-1">{selectedReturn.refundMethod}</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+            {selectedReturn.inspectionNotes && (
+              <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Inspection Notes</p>
+                <p className="text-xs font-medium text-slate-600">{selectedReturn.inspectionNotes}</p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* New Return Modal */}
-      {showNewModal && (
+      {mounted && showNewModal && (
         <NewReturnModal
           onClose={() => setShowNewModal(false)}
           onSuccess={handleReturnCreated}
@@ -446,20 +449,14 @@ function NewReturnModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-          <div className="flex items-center gap-2">
-            <RefreshCw size={18} className="text-amber-700" />
-            <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-              Process Sales Return & Credit Note
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Process Sales Return & Credit Note"
+      icon={<RefreshCw size={18} className="text-amber-700" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="input-label">Lookup Original Invoice #</label>
             <div className="flex gap-2">
@@ -587,7 +584,6 @@ function NewReturnModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

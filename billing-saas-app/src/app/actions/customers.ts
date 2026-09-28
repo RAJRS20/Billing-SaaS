@@ -98,8 +98,41 @@ export async function fetchCustomerHistoryAction(customerId: string) {
         },
       },
     });
+    if (!customer) return null;
 
-    return customer;
+    return {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email,
+      address: customer.address,
+      city: customer.city,
+      gstin: customer.gstin,
+      panNumber: customer.panNumber,
+      notes: customer.notes,
+      sales: customer.sales.map((s) => ({
+        id: s.id,
+        invoiceNumber: s.invoiceNumber,
+        netAmount: Number(s.netAmount),
+        createdAt: s.createdAt.toISOString(),
+      })),
+      orders: customer.orders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        estimatedAmount: Number(o.estimatedAmount),
+        advancePaid: Number(o.advancePaid),
+        balanceDue: Number(o.balanceDue),
+        status: o.status,
+        createdAt: o.createdAt.toISOString(),
+      })),
+      advances: customer.advances.map((a) => ({
+        id: a.id,
+        amount: Number(a.amount),
+        method: a.method,
+        isAdjusted: a.isAdjusted,
+        createdAt: a.createdAt.toISOString(),
+      })),
+    };
   } catch (error) {
     console.error("fetchCustomerHistoryAction error:", error);
     return null;

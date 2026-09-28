@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, Phone, Mail, MapPin, Building2,
   ChevronDown, X, Check, FileText, Eye,
@@ -8,6 +9,8 @@ import {
   ArrowUpRight, ArrowDownRight, TrendingUp, AlertCircle,
 } from "lucide-react";
 import { createSupplierAction } from "@/app/actions/purchases";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +51,11 @@ export default function SuppliersClient({
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierData | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     return suppliers.filter((s) => {
@@ -265,90 +273,70 @@ export default function SuppliersClient({
       </div>
 
       {/* Supplier Detail Panel */}
-      {selectedSupplier && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          <div
-            className="absolute inset-0"
-            style={{ background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)" }}
-            onClick={() => setSelectedSupplier(null)}
-          />
-          <div
-            className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto animate-scale-in"
-            style={{
-              background: "var(--bg-surface)",
-              borderLeft: "1px solid var(--border)",
-              boxShadow: "-20px 0 60px rgba(15, 23, 42, 0.12)",
-            }}
-          >
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-              <div>
-                <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>
-                  {selectedSupplier.name}
-                </h3>
-                <p className="text-xs font-medium text-slate-400 mt-0.5">{selectedSupplier.category} Supplier</p>
+      <SlideOver
+        isOpen={!!selectedSupplier}
+        onClose={() => setSelectedSupplier(null)}
+        title={selectedSupplier?.name}
+        subtitle={`${selectedSupplier?.category} Supplier`}
+      >
+        {selectedSupplier && (
+          <div className="space-y-6">
+            {/* Financial Snapshot */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl border bg-slate-50 border-slate-200">
+                <p className="text-[10px] uppercase font-semibold text-slate-400">Total Orders</p>
+                <p className="text-sm font-bold text-slate-800 mt-1">{fmt(selectedSupplier.totalPurchases)}</p>
               </div>
-              <button className="btn-ghost p-2" onClick={() => setSelectedSupplier(null)}>
-                <X size={18} />
-              </button>
+              <div className="p-3 rounded-xl border bg-emerald-50/60 border-emerald-200">
+                <p className="text-[10px] uppercase font-semibold text-emerald-700">Settled</p>
+                <p className="text-sm font-bold text-emerald-800 mt-1">{fmt(selectedSupplier.totalPaid)}</p>
+              </div>
+              <div className="p-3 rounded-xl border bg-red-50/60 border-red-200">
+                <p className="text-[10px] uppercase font-semibold text-red-700">Due Balance</p>
+                <p className="text-sm font-bold text-red-800 mt-1">{fmt(selectedSupplier.totalDue)}</p>
+              </div>
             </div>
-            <div className="p-6 space-y-6">
-              {/* Financial Snapshot */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 rounded-xl border bg-slate-50 border-slate-200">
-                  <p className="text-[10px] uppercase font-semibold text-slate-400">Total Orders</p>
-                  <p className="text-sm font-bold text-slate-800 mt-1">{fmt(selectedSupplier.totalPurchases)}</p>
-                </div>
-                <div className="p-3 rounded-xl border bg-emerald-50/60 border-emerald-200">
-                  <p className="text-[10px] uppercase font-semibold text-emerald-700">Settled</p>
-                  <p className="text-sm font-bold text-emerald-800 mt-1">{fmt(selectedSupplier.totalPaid)}</p>
-                </div>
-                <div className="p-3 rounded-xl border bg-red-50/60 border-red-200">
-                  <p className="text-[10px] uppercase font-semibold text-red-700">Due Balance</p>
-                  <p className="text-sm font-bold text-red-800 mt-1">{fmt(selectedSupplier.totalDue)}</p>
-                </div>
-              </div>
 
-              {/* Contact Information */}
-              <div className="space-y-3">
-                <h4 className="section-title">Supplier Information</h4>
-                <div className="space-y-2 rounded-xl border p-4 border-slate-200 text-xs">
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">Contact Person:</span>
-                    <span className="font-semibold text-slate-800">{selectedSupplier.contactPerson || "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">Phone Number:</span>
-                    <span className="font-semibold text-slate-800">{selectedSupplier.phone}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">Email:</span>
-                    <span className="font-semibold text-slate-800">{selectedSupplier.email || "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">GSTIN:</span>
-                    <span className="font-mono font-semibold text-slate-800">{selectedSupplier.gstin || "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">PAN Number:</span>
-                    <span className="font-mono font-semibold text-slate-800">{selectedSupplier.panNumber || "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">Address:</span>
-                    <span className="font-semibold text-slate-800">{selectedSupplier.address || "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-slate-500 font-medium">Credit Window:</span>
-                    <span className="font-semibold text-slate-800">{selectedSupplier.creditTermDays} days</span>
-                  </div>
+            {/* Contact Information */}
+            <div className="space-y-3">
+              <h4 className="section-title">Supplier Information</h4>
+              <div className="space-y-2 rounded-xl border p-4 border-slate-200 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Contact Person:</span>
+                  <span className="font-semibold text-slate-800">{selectedSupplier.contactPerson || "—"}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Phone Number:</span>
+                  <span className="font-semibold text-slate-800">{selectedSupplier.phone}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Email:</span>
+                  <span className="font-semibold text-slate-800">{selectedSupplier.email || "—"}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">GSTIN:</span>
+                  <span className="font-mono font-semibold text-slate-800">{selectedSupplier.gstin || "—"}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">PAN Number:</span>
+                  <span className="font-mono font-semibold text-slate-800">{selectedSupplier.panNumber || "—"}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Address:</span>
+                  <span className="font-semibold text-slate-800">{selectedSupplier.address || "—"}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-500 font-medium">Credit Window:</span>
+                  <span className="font-semibold text-slate-800">{selectedSupplier.creditTermDays} days</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* Add Supplier Modal */}
-      {showAddModal && (
+      {mounted && showAddModal && (
         <AddSupplierModal
           onClose={() => setShowAddModal(false)}
           onSuccess={handleSupplierAdded}
@@ -432,20 +420,14 @@ function AddSupplierModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-          <div className="flex items-center gap-2">
-            <Building2 size={18} className="text-amber-700" />
-            <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-              Add New Supplier / Vendor
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add New Supplier / Vendor"
+      icon={<Building2 size={18} className="text-amber-700" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="input-label">Business Name *</label>
@@ -564,7 +546,6 @@ function AddSupplierModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

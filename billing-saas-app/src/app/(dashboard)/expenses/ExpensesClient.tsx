@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, ChevronDown, X, Check,
   IndianRupee, Calendar, TrendingUp, Receipt,
@@ -9,6 +10,7 @@ import {
   ArrowUpRight, ArrowDownRight, BarChart3,
 } from "lucide-react";
 import { createExpenseAction } from "@/app/actions/expenses";
+import Modal from "@/components/Modal";
 
 export interface ExpenseRecord {
   id: string;
@@ -40,6 +42,11 @@ export default function ExpensesClient({ initialExpenses, categories }: Expenses
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [form, setForm] = useState({
     description: "",
@@ -328,29 +335,20 @@ export default function ExpensesClient({ initialExpenses, categories }: Expenses
       </div>
 
       {/* Add Expense Modal */}
-      {showAddModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div
-            className="modal-box max-w-md p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <Receipt className="text-amber-600" size={18} />
-                <h3 className="font-bold text-base text-slate-900">Record Showroom Expense</h3>
-              </div>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
-                ✕
-              </button>
-            </div>
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Record Showroom Expense"
+        icon={<Receipt className="text-amber-600" size={18} />}
+        maxWidth="max-w-md"
+      >
+        {errorMsg && (
+          <div className="mb-3 p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
+            {errorMsg}
+          </div>
+        )}
 
-            {errorMsg && (
-              <div className="mt-3 p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleAddExpense} className="space-y-3 mt-4 text-xs">
+        <form onSubmit={handleAddExpense} className="space-y-3 text-xs">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Expense Description *</label>
                 <input
@@ -434,9 +432,7 @@ export default function ExpensesClient({ initialExpenses, categories }: Expenses
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

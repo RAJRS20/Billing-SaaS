@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { calculatePricing, type ProductPricingInput } from "@/lib/pricing";
 import { finalizePOSSaleAction } from "@/app/actions/pos";
+import Modal from "@/components/Modal";
 import { createEstimateAction } from "@/app/actions/estimates";
 import PrintableInvoiceReceipt, { PrintableReceiptData } from "@/components/PrintableInvoiceReceipt";
 
@@ -133,7 +134,7 @@ function computeItemPricing(item: CartItem) {
     makingChargeType: item.makingChargeType,
     makingChargeValue: item.makingChargeValue,
     stoneChargeFixed: item.stoneChargeFixed,
-    discountType: "AMOUNT",
+    discountType: "PERCENTAGE",
     discountValue: item.discount,
     cgstPercent: 1.5,
     sgstPercent: 1.5,
@@ -294,12 +295,15 @@ export default function BillingClient({
 
     const res = await finalizePOSSaleAction({
       customerId: selectedCustomerId || undefined,
-      items: cart.map((i) => ({
-        productId: i.productId,
-        quantity: i.qty,
-        customRatePerGram: i.goldRate,
-        discountAmount: i.discount + (cart.length > 0 ? discount / cart.length : 0),
-      })),
+      items: cart.map((i) => {
+        const itemPricing = computeItemPricing(i);
+        return {
+          productId: i.productId,
+          quantity: i.qty,
+          customRatePerGram: i.goldRate,
+          discountAmount: itemPricing.discountAmount + (cart.length > 0 ? discount / cart.length : 0),
+        };
+      }),
       payments: [
         {
           method: selectedPayment as any,
@@ -378,7 +382,7 @@ export default function BillingClient({
       customerName: currentCust?.name || "Walk-in Customer",
       customerPhone: currentCust?.phone || undefined,
       notes: notes || undefined,
-      discountAmount: discount,
+      discountAmount: totalDiscount,
       items: cart.map((i) => {
         const pricing = computeItemPricing(i);
         return {
@@ -641,6 +645,9 @@ export default function BillingClient({
                               ["Gold Value", fmt(pricing.goldValue)],
                               ["Making", fmt(pricing.makingCharge)],
                               ["Stone Charge", fmt(pricing.stoneCharge)],
+                              ...(pricing.discountAmount > 0
+                                ? [["Disc (" + item.discount + "%)", `-${fmt(pricing.discountAmount)}`]] as [string, string][]
+                                : []),
                               ["Tax (3%)", fmt(pricing.totalTaxAmount)],
                             ].map(([k, v]) => (
                               <div key={k} className="flex justify-between gap-1">
@@ -651,7 +658,7 @@ export default function BillingClient({
                           </div>
 
                           {/* Gold rate + discount inputs */}
-                          <div className="mt-2 flex gap-2">
+                          <div className="mt-2 flex flex-wrap items-center gap-3">
                             <div className="flex items-center gap-1">
                               <span className="text-xs" style={{ color: "var(--text-muted)" }}>Rate:</span>
                               {editingRate === item.id ? (
@@ -674,18 +681,32 @@ export default function BillingClient({
                                 </button>
                               )}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Tag size={11} style={{ color: "var(--text-muted)" }} />
-                              <span className="text-xs" style={{ color: "var(--text-muted)" }}>Disc:</span>
-                              <input
-                                type="number"
-                                className="input py-1 px-2 text-xs w-20"
-                                value={item.discount || ""}
-                                onChange={(e) =>
-                                  updateDiscount(item.id, parseFloat(e.target.value) || 0)
-                                }
-                                placeholder="₹0"
-                              />
+                            <div className="flex items-center gap-1.5">
+                              <Percent size={11} style={{ color: "var(--text-muted)" }} />
+                              <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Disc:</span>
+                              <div className="relative flex items-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="any"
+                                  className="input py-1 pl-2 pr-5 text-xs w-20 font-medium"
+                                  value={item.discount || ""}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    updateDiscount(item.id, Math.min(100, Math.max(0, val)));
+                                  }}
+                                  placeholder="0"
+                                />
+                                <span className="absolute right-2 text-xs font-semibold pointer-events-none" style={{ color: "var(--text-muted)" }}>
+                                  %
+                                </span>
+                              </div>
+                              {pricing.discountAmount > 0 && (
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  (-{fmt(pricing.discountAmount)})
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -739,7 +760,7 @@ export default function BillingClient({
             <div className="flex items-center gap-2">
               <Percent size={13} style={{ color: "var(--text-muted)" }} />
               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Extra Discount
+                Extra Discount (₹)
               </span>
               <input
                 type="number"
@@ -913,78 +934,65 @@ export default function BillingClient({
     </div>
 
       {/* PAN Compliance Modal */}
-      {showPanModal && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 no-print animate-fade-in"
-          style={{ pointerEvents: "auto" }}
-          onClick={() => setShowPanModal(false)}
-        >
-          <div
-            className="card p-6 flex flex-col gap-4 animate-scale-in max-w-md w-full bg-white shadow-2xl rounded-2xl border border-slate-200 text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b">
-              <div className="flex items-center gap-2 text-amber-700">
-                <ShieldAlert size={20} />
-                <h3 className="font-bold text-base text-slate-900">Mandatory PAN Requirement</h3>
-              </div>
-              <button onClick={() => setShowPanModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
-              <p className="font-semibold">Income Tax Rule 114B & Section 269ST:</p>
-              <p className="mt-1 text-amber-800">
-                For jewellery cash purchases of ₹2,00,000 or more, quoting customer PAN is mandatory by Indian statutory law.
-              </p>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-700">Enter Customer PAN</label>
-              <input
-                type="text"
-                autoFocus
-                maxLength={10}
-                placeholder="ABCDE1234F"
-                value={panInput}
-                onChange={(e) => setPanInput(e.target.value.toUpperCase())}
-                className="input mt-1.5 uppercase font-mono tracking-widest text-sm font-bold bg-slate-50 border-slate-300 py-2.5"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">10-character alphanumeric PAN format</p>
-            </div>
-            <div className="flex gap-2 pt-2 border-t">
-              <button
-                type="button"
-                className="btn-outline flex-1 justify-center py-2 text-xs"
-                onClick={() => setShowPanModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-gold flex-1 justify-center py-2 text-xs font-semibold"
-                disabled={!panInput || panInput.length < 10}
-                onClick={() => {
-                  setShowPanModal(false);
-                  handleFinalize(panInput);
-                }}
-              >
-                Confirm & Finalize
-              </button>
-            </div>
+      <Modal
+        isOpen={showPanModal}
+        onClose={() => setShowPanModal(false)}
+        title="Mandatory PAN Requirement"
+        icon={<ShieldAlert className="text-amber-700" size={20} />}
+        maxWidth="max-w-md"
+      >
+        <div className="flex flex-col gap-4 text-left">
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
+            <p className="font-semibold">Income Tax Rule 114B & Section 269ST:</p>
+            <p className="mt-1 text-amber-800">
+              For jewellery cash purchases of ₹2,00,000 or more, quoting customer PAN is mandatory by Indian statutory law.
+            </p>
           </div>
-        </div>,
-        document.body
-      )}
+          <div>
+            <label className="text-xs font-bold text-slate-700">Enter Customer PAN</label>
+            <input
+              type="text"
+              autoFocus
+              maxLength={10}
+              placeholder="ABCDE1234F"
+              value={panInput}
+              onChange={(e) => setPanInput(e.target.value.toUpperCase())}
+              className="input mt-1.5 uppercase font-mono tracking-widest text-sm font-bold bg-slate-50 border-slate-300 py-2.5"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">10-character alphanumeric PAN format</p>
+          </div>
+          <div className="flex gap-2 pt-2 border-t">
+            <button
+              type="button"
+              className="btn-outline flex-1 justify-center py-2 text-xs"
+              onClick={() => setShowPanModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-gold flex-1 justify-center py-2 text-xs font-semibold"
+              disabled={!panInput || panInput.length < 10}
+              onClick={() => {
+                setShowPanModal(false);
+                handleFinalize(panInput);
+              }}
+            >
+              Confirm & Finalize
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Estimate Success Modal */}
       {showEstimateSuccess && mounted && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 no-print animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 overflow-y-auto no-print animate-fade-in"
           style={{ pointerEvents: "auto" }}
           onClick={() => setShowEstimateSuccess(false)}
         >
           <div
-            className="card p-7 flex flex-col items-center gap-4 animate-scale-in text-center max-w-md w-full bg-white shadow-2xl rounded-2xl border border-slate-200"
+            className="card p-7 my-auto flex flex-col items-center gap-4 animate-scale-in text-center max-w-md w-full bg-white shadow-2xl rounded-2xl border border-slate-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-full flex items-center justify-center bg-amber-100 text-amber-700 shadow-inner">
@@ -1024,72 +1032,45 @@ export default function BillingClient({
       )}
 
       {/* Print Preview Modal */}
-      {showPrintPreview && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 overflow-y-auto no-print animate-fade-in"
-          style={{ pointerEvents: "auto" }}
-          onClick={() => setShowPrintPreview(false)}
-        >
-          <div
-            className="card p-6 flex flex-col gap-4 animate-scale-in max-w-2xl w-full bg-white shadow-2xl rounded-2xl border border-slate-200 my-8 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b sticky top-0 bg-white z-10">
-              <div className="flex items-center gap-2">
-                <FileText className="text-amber-600" size={20} />
-                <h3 className="font-bold text-base text-slate-900">Tax Invoice / Receipt Preview</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="btn-gold text-xs px-3 py-1.5 flex items-center gap-1.5"
-                  onClick={() => window.print()}
-                >
-                  <Printer size={14} /> Print Document
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPrintPreview(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Receipt Content Preview */}
-            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
-              <PrintableInvoiceReceipt data={activePrintData} forceVisible />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <button
-                type="button"
-                className="btn-outline text-xs px-4 py-2"
-                onClick={() => setShowPrintPreview(false)}
-              >
-                Close Preview
-              </button>
-              <button
-                type="button"
-                className="btn-gold text-xs px-4 py-2 flex items-center gap-1.5"
-                onClick={() => window.print()}
-              >
-                <Printer size={14} /> Print Receipt (Ctrl+P)
-              </button>
-            </div>
+      <Modal
+        isOpen={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        title="Tax Invoice / Receipt Preview"
+        icon={<FileText className="text-amber-600" size={20} />}
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-4">
+          {/* Receipt Content Preview */}
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+            <PrintableInvoiceReceipt data={activePrintData} forceVisible />
           </div>
-        </div>,
-        document.body
-      )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <button
+              type="button"
+              className="btn-outline text-xs px-4 py-2"
+              onClick={() => setShowPrintPreview(false)}
+            >
+              Close Preview
+            </button>
+            <button
+              type="button"
+              className="btn-gold text-xs px-4 py-2 flex items-center gap-1.5"
+              onClick={() => window.print()}
+            >
+              <Printer size={14} /> Print Receipt (Ctrl+P)
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Success overlay mounted directly to document.body to prevent parent container transform clipping */}
       {showSuccess && mounted && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 no-print animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 overflow-y-auto no-print animate-fade-in"
           style={{ pointerEvents: "auto" }}
         >
-          <div className="card p-8 flex flex-col items-center gap-5 animate-scale-in text-center max-w-md w-full bg-white shadow-2xl rounded-2xl border border-slate-200">
+          <div className="card p-8 my-auto flex flex-col items-center gap-5 animate-scale-in text-center max-w-md w-full bg-white shadow-2xl rounded-2xl border border-slate-200">
             <div className="w-16 h-16 rounded-full flex items-center justify-center bg-emerald-100 text-emerald-600 shadow-inner">
               <CheckCircle2 size={36} />
             </div>

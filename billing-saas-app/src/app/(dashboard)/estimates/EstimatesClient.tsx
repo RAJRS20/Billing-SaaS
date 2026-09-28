@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Search, ChevronDown, X, Check, Eye,
   FileText, Clock, CheckCircle2, XCircle, ArrowRight,
@@ -8,6 +9,8 @@ import {
 } from "lucide-react";
 import { createEstimateAction, updateEstimateStatusAction } from "@/app/actions/estimates";
 import { EstimateStatus } from "@prisma/client";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 export interface EstimateItemRecord {
   id: string;
@@ -79,6 +82,11 @@ export default function EstimatesClient({
   const [statusFilter, setStatusFilter] = useState<EstimateStatus | "ALL">("ALL");
   const [selectedEstimate, setSelectedEstimate] = useState<EstimateRecord | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -414,30 +422,21 @@ export default function EstimatesClient({
       </div>
 
       {/* New Estimate Modal */}
-      {showAddModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div
-            className="modal-box max-w-xl p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <FileText className="text-amber-600" size={18} />
-                <h3 className="font-bold text-base text-slate-900">Create New Jewellery Estimate</h3>
-              </div>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
-                ✕
-              </button>
-            </div>
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Create New Jewellery Estimate"
+        icon={<FileText className="text-amber-600" size={18} />}
+        maxWidth="max-w-xl"
+      >
+        {errorMsg && (
+          <div className="mb-3 p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
+            {errorMsg}
+          </div>
+        )}
 
-            {errorMsg && (
-              <div className="mt-3 p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateEstimate} className="space-y-4 mt-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleCreateEstimate} className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Selection</label>
                   <select
@@ -573,107 +572,95 @@ export default function EstimatesClient({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* View Estimate Details Modal */}
-      {selectedEstimate && (
-        <div className="modal-backdrop" onClick={() => setSelectedEstimate(null)}>
-          <div
-            className="modal-box max-w-lg p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+      {/* View Estimate Details Slide-Over */}
+      <SlideOver
+        isOpen={!!selectedEstimate}
+        onClose={() => setSelectedEstimate(null)}
+        title={selectedEstimate ? selectedEstimate.estimateNumber : "Estimate Details"}
+        subtitle={selectedEstimate ? `Issued: ${selectedEstimate.estimateDate}` : ""}
+      >
+        {selectedEstimate && (
+          <div className="space-y-4 text-xs">
+            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border">
               <div>
-                <h3 className="font-bold text-sm text-slate-900">{selectedEstimate.estimateNumber}</h3>
-                <p className="text-[11px] text-slate-500">Issued: {selectedEstimate.estimateDate}</p>
+                <span className="text-[10px] text-slate-400 block">Customer</span>
+                <span className="font-bold text-slate-800">{selectedEstimate.customer}</span>
+                <span className="text-[11px] text-slate-500 block">{selectedEstimate.phone}</span>
               </div>
-              <button onClick={() => setSelectedEstimate(null)} className="text-slate-400 hover:text-slate-600">
-                ✕
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block">Status</span>
+                <span className="badge badge-gold">{selectedEstimate.status}</span>
+              </div>
+            </div>
+
+            {/* Items List */}
+            <div className="space-y-2">
+              <span className="font-semibold text-slate-700 block">Items Quoted</span>
+              {selectedEstimate.items.map((i) => (
+                <div key={i.id} className="p-2.5 rounded-lg border bg-white flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-slate-800">{i.name}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {i.weight}g · Rate: ₹{i.rate}/g · Making: ₹{i.makingCharge}
+                    </p>
+                  </div>
+                  <span className="font-bold text-slate-900">{fmt(i.amount)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-600">Gross Total</span>
+                <span className="font-semibold text-slate-800">{fmt(selectedEstimate.grossAmount)}</span>
+              </div>
+              {selectedEstimate.discount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Discount</span>
+                  <span>− {fmt(selectedEstimate.discount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-slate-600">GST (3%)</span>
+                <span className="font-semibold text-slate-800">{fmt(selectedEstimate.tax)}</span>
+              </div>
+              <div className="flex justify-between font-bold text-sm text-slate-900 pt-1 border-t border-amber-200">
+                <span>Net Estimated Quote</span>
+                <span>{fmt(selectedEstimate.netAmount)}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <div className="flex gap-2">
+                {selectedEstimate.status === "PENDING" && (
+                  <>
+                    <button
+                      onClick={() => handleUpdateStatus(selectedEstimate.id, "APPROVED")}
+                      className="btn-gold text-xs px-3"
+                    >
+                      <Check size={12} /> Customer Approved
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus(selectedEstimate.id, "CANCELLED")}
+                      className="btn-outline text-xs px-3 text-red-600 border-red-200"
+                    >
+                      Cancel Quote
+                    </button>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => window.print()}
+                className="btn-outline text-xs px-3 gap-1"
+              >
+                <Printer size={13} /> Print
               </button>
             </div>
-
-            <div className="space-y-4 mt-4 text-xs">
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Customer</span>
-                  <span className="font-bold text-slate-800">{selectedEstimate.customer}</span>
-                  <span className="text-[11px] text-slate-500 block">{selectedEstimate.phone}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block">Status</span>
-                  <span className="badge badge-gold">{selectedEstimate.status}</span>
-                </div>
-              </div>
-
-              {/* Items List */}
-              <div className="space-y-2">
-                <span className="font-semibold text-slate-700 block">Items Quoted</span>
-                {selectedEstimate.items.map((i) => (
-                  <div key={i.id} className="p-2.5 rounded-lg border bg-white flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-slate-800">{i.name}</p>
-                      <p className="text-[10px] text-slate-400">
-                        {i.weight}g · Rate: ₹{i.rate}/g · Making: ₹{i.makingCharge}
-                      </p>
-                    </div>
-                    <span className="font-bold text-slate-900">{fmt(i.amount)}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Gross Total</span>
-                  <span className="font-semibold text-slate-800">{fmt(selectedEstimate.grossAmount)}</span>
-                </div>
-                {selectedEstimate.discount > 0 && (
-                  <div className="flex justify-between text-emerald-700">
-                    <span>Discount</span>
-                    <span>− {fmt(selectedEstimate.discount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-600">GST (3%)</span>
-                  <span className="font-semibold text-slate-800">{fmt(selectedEstimate.tax)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-sm text-slate-900 pt-1 border-t border-amber-200">
-                  <span>Net Estimated Quote</span>
-                  <span>{fmt(selectedEstimate.netAmount)}</span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <div className="flex gap-2">
-                  {selectedEstimate.status === "PENDING" && (
-                    <>
-                      <button
-                        onClick={() => handleUpdateStatus(selectedEstimate.id, "APPROVED")}
-                        className="btn-gold text-xs px-3"
-                      >
-                        <Check size={12} /> Customer Approved
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(selectedEstimate.id, "CANCELLED")}
-                        className="btn-outline text-xs px-3 text-red-600 border-red-200"
-                      >
-                        Cancel Quote
-                      </button>
-                    </>
-                  )}
-                </div>
-                <button
-                  onClick={() => window.print()}
-                  className="btn-outline text-xs px-3 gap-1"
-                >
-                  <Printer size={13} /> Print
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
     </div>
   );
 }

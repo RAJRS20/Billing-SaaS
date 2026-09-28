@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   Filter,
@@ -17,6 +18,7 @@ import {
   CreditCard,
   IndianRupee,
 } from "lucide-react";
+import Modal from "@/components/Modal";
 import PrintableInvoiceReceipt, { PrintableReceiptData } from "@/components/PrintableInvoiceReceipt";
 
 export interface InvoiceItemDetail {
@@ -63,6 +65,11 @@ export default function InvoicesClient({
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
@@ -293,87 +300,99 @@ export default function InvoicesClient({
       </div>
 
       {/* Invoice Detail Modal / Print Preview */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center no-print" style={{ pointerEvents: "auto" }}>
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSelectedInvoice(null)} />
-          <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto bg-white">
-            <div className="px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-              <div className="flex items-center gap-2">
-                <Receipt size={18} className="text-amber-700" />
-                <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-                  Tax Invoice: {selectedInvoice.invoiceNumber}
-                </h3>
+      <Modal
+        isOpen={!!selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+        title={selectedInvoice ? `Tax Invoice: ${selectedInvoice.invoiceNumber}` : "Tax Invoice"}
+        icon={<Receipt size={20} className="text-amber-700" />}
+        maxWidth="max-w-2xl"
+      >
+        {selectedInvoice && (
+          <div className="space-y-4 text-xs">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Customer</p>
+                <p className="font-bold text-sm text-slate-900 mt-0.5">{selectedInvoice.customer}</p>
+                <p className="text-slate-500 font-mono text-xs">{selectedInvoice.phone}</p>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  className="btn-outline text-xs py-1 px-2.5 flex items-center gap-1"
-                  onClick={() => window.print()}
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Invoice Date</p>
+                <p className="font-medium text-slate-700 mt-0.5">{selectedInvoice.date}</p>
+                <span
+                  className={`badge text-[10px] mt-1 ${
+                    selectedInvoice.status === "PAID"
+                      ? "badge-success"
+                      : selectedInvoice.status === "PARTIAL"
+                      ? "badge-gold"
+                      : "badge-danger"
+                  }`}
                 >
-                  <Printer size={13} /> Print
-                </button>
-                <button className="btn-ghost p-1.5" onClick={() => setSelectedInvoice(null)}>
-                  <X size={16} />
-                </button>
+                  {selectedInvoice.status}
+                </span>
               </div>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
-              <div className="flex justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <p className="font-bold text-slate-900">{selectedInvoice.customer}</p>
-                  <p className="text-slate-500">{selectedInvoice.phone}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-slate-500">{selectedInvoice.date}</p>
-                  <span className="badge badge-success text-[10px] mt-0.5">{selectedInvoice.status}</span>
-                </div>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-700 mb-2 uppercase text-[10px] tracking-wider">Line Items</p>
-                <div className="space-y-2">
-                  {selectedInvoice.items.map((item, idx) => (
-                    <div key={idx} className="p-2.5 rounded-lg border border-slate-200 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-slate-800">{item.productName}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          {item.sku} {item.huid ? `· HUID: ${item.huid}` : ""} · Net: {item.netWeight}g
-                        </p>
-                      </div>
-                      <p className="font-bold text-gold">{fmt(item.itemNetAmount)}</p>
+            <div>
+              <p className="font-bold text-slate-700 mb-2 uppercase text-[10px] tracking-wider">Line Items Breakdown</p>
+              <div className="space-y-2">
+                {selectedInvoice.items.map((item, idx) => (
+                  <div key={idx} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-slate-900 text-xs">{item.productName}</p>
+                      <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        SKU: {item.sku} {item.huid ? `· HUID: ${item.huid}` : ""} · Net Weight: {item.netWeight}g
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-3 bg-slate-50 space-y-1 text-xs">
-                <div className="flex justify-between text-slate-600">
-                  <span>Gross Taxable Amount:</span>
-                  <strong className="text-slate-800">{fmt(selectedInvoice.grossAmount)}</strong>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>GST (3%):</span>
-                  <strong className="text-slate-800">{fmt(selectedInvoice.tax)}</strong>
-                </div>
-                <div className="flex justify-between text-sm pt-1 border-t border-slate-200 font-bold text-slate-900">
-                  <span>Total Net Payable:</span>
-                  <span className="text-amber-800">{fmt(selectedInvoice.netAmount)}</span>
-                </div>
-                <div className="flex justify-between text-slate-600 pt-1">
-                  <span>Amount Paid ({selectedInvoice.paymentMethod}):</span>
-                  <strong className="text-emerald-700">{fmt(selectedInvoice.amountPaid)}</strong>
-                </div>
-                {selectedInvoice.amountDue > 0 && (
-                  <div className="flex justify-between text-red-600 font-bold">
-                    <span>Balance Due:</span>
-                    <span>{fmt(selectedInvoice.amountDue)}</span>
+                    <p className="font-bold text-gold text-sm font-mono">{fmt(item.itemNetAmount)}</p>
                   </div>
-                )}
+                ))}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Gross Taxable Amount:</span>
+                <strong className="text-slate-800 font-mono">{fmt(selectedInvoice.grossAmount)}</strong>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>GST Total (3%):</span>
+                <strong className="text-slate-800 font-mono">{fmt(selectedInvoice.tax)}</strong>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-slate-200 font-bold text-slate-900">
+                <span>Total Net Payable:</span>
+                <span className="text-amber-800 font-mono text-base">{fmt(selectedInvoice.netAmount)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 pt-1">
+                <span>Amount Paid ({selectedInvoice.paymentMethod}):</span>
+                <strong className="text-emerald-700 font-mono">{fmt(selectedInvoice.amountPaid)}</strong>
+              </div>
+              {selectedInvoice.amountDue > 0 && (
+                <div className="flex justify-between text-red-600 font-bold pt-1">
+                  <span>Balance Due:</span>
+                  <span className="font-mono">{fmt(selectedInvoice.amountDue)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-outline text-xs px-4 py-2"
+                onClick={() => setSelectedInvoice(null)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn-gold text-xs px-4 py-2 flex items-center gap-1.5 shadow-sm"
+                onClick={() => window.print()}
+              >
+                <Printer size={14} /> Print Receipt (Ctrl+P)
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Professional GST-compliant printable receipt template */}
       {selectedInvoice && (

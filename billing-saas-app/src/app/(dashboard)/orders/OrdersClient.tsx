@@ -13,6 +13,8 @@ import {
   updateOrderStatusAction,
 } from "@/app/actions/orders";
 import { OrderStatus, PaymentMethod } from "@prisma/client";
+import Modal from "@/components/Modal";
+import SlideOver from "@/components/SlideOver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -409,111 +411,106 @@ export default function OrdersClient({
       )}
 
       {/* Order Detail Panel */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50" style={{ pointerEvents: "auto" }}>
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto animate-scale-in bg-white border-l border-slate-200 shadow-2xl">
-            <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-white">
-              <div>
-                <h3 className="font-bold text-base" style={{ fontFamily: "var(--font-display)" }}>Order Details</h3>
-                <p className="text-xs font-bold text-amber-800 mt-0.5">{selectedOrder.orderNumber}</p>
-              </div>
-              <button className="btn-ghost p-2" onClick={() => setSelectedOrder(null)}><X size={18} /></button>
+      <SlideOver
+        isOpen={!!selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        title="Order Details"
+        subtitle={selectedOrder?.orderNumber}
+      >
+        {selectedOrder && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Customer", value: selectedOrder.customer },
+                { label: "Phone", value: selectedOrder.phone },
+                { label: "Order Date", value: selectedOrder.orderDate },
+                { label: "Expected Delivery", value: selectedOrder.expectedDate || "—" },
+                { label: "Estimated Amount", value: fmt(selectedOrder.estimatedAmount) },
+                { label: "Advance Paid", value: fmt(selectedOrder.advancePaid) },
+                { label: "Balance Due", value: fmt(selectedOrder.balanceDue) },
+              ].map((d) => (
+                <div key={d.label} className="rounded-xl p-3 border bg-slate-50 border-slate-200">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
+                </div>
+              ))}
             </div>
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Customer", value: selectedOrder.customer },
-                  { label: "Phone", value: selectedOrder.phone },
-                  { label: "Order Date", value: selectedOrder.orderDate },
-                  { label: "Expected Delivery", value: selectedOrder.expectedDate || "—" },
-                  { label: "Estimated Amount", value: fmt(selectedOrder.estimatedAmount) },
-                  { label: "Advance Paid", value: fmt(selectedOrder.advancePaid) },
-                  { label: "Balance Due", value: fmt(selectedOrder.balanceDue) },
-                ].map((d) => (
-                  <div key={d.label} className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{d.label}</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{d.value}</p>
-                  </div>
-                ))}
-              </div>
 
-              {/* Status Updater */}
-              <div className="rounded-xl p-4 border bg-amber-50/50 border-amber-200 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-800">Order Status</p>
-                  <p className="text-sm font-bold text-amber-950 mt-0.5">{selectedOrder.status}</p>
-                </div>
-                <div className="flex gap-2">
-                  {selectedOrder.status === "PENDING" && (
-                    <button
-                      className="btn-gold text-xs py-1 px-2.5"
-                      onClick={() => handleStatusChange(selectedOrder.id, OrderStatus.IN_PROGRESS)}
-                    >
-                      Start Workshop
-                    </button>
-                  )}
-                  {selectedOrder.status === "IN_PROGRESS" && (
-                    <button
-                      className="btn-gold text-xs py-1 px-2.5 bg-emerald-600"
-                      onClick={() => handleStatusChange(selectedOrder.id, OrderStatus.READY)}
-                    >
-                      Mark Ready
-                    </button>
-                  )}
-                  {selectedOrder.status === "READY" && (
-                    <button
-                      className="btn-gold text-xs py-1 px-2.5"
-                      onClick={() => handleStatusChange(selectedOrder.id, OrderStatus.DELIVERED)}
-                    >
-                      Mark Delivered
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Description</p>
-                <p className="text-xs font-medium text-slate-600 mt-0.5">{selectedOrder.description}</p>
-              </div>
-
-              {/* Advance Receipts */}
+            {/* Status Updater */}
+            <div className="rounded-xl p-4 border bg-amber-50/50 border-amber-200 flex items-center justify-between">
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="section-title flex items-center gap-2">
-                    <Wallet size={16} style={{ color: "var(--gold-500)" }} />
-                    Advance Receipts
-                  </h4>
-                  {selectedOrder.balanceDue > 0 && (
-                    <button
-                      className="btn-gold text-xs py-1 px-3"
-                      onClick={() => setShowAdvanceModal(true)}
-                    >
-                      + Add Advance
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {advances
-                    .filter((a) => a.orderNumber === selectedOrder.orderNumber)
-                    .map((a) => (
-                      <div key={a.id} className="p-3 rounded-xl border flex items-center justify-between border-slate-200">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">{a.date}</p>
-                          <p className="text-[10px] text-slate-400">{a.method} {a.reference ? `· ${a.reference}` : ""}</p>
-                        </div>
-                        <span className="text-sm font-bold text-emerald-700">{fmt(a.amount)}</span>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-800">Order Status</p>
+                <p className="text-sm font-bold text-amber-950 mt-0.5">{selectedOrder.status}</p>
+              </div>
+              <div className="flex gap-2">
+                {selectedOrder.status === "PENDING" && (
+                  <button
+                    className="btn-gold text-xs py-1 px-2.5"
+                    onClick={() => handleStatusChange(selectedOrder.id, OrderStatus.IN_PROGRESS)}
+                  >
+                    Start Workshop
+                  </button>
+                )}
+                {selectedOrder.status === "IN_PROGRESS" && (
+                  <button
+                    className="btn-gold text-xs py-1 px-2.5 bg-emerald-600"
+                    onClick={() => handleStatusChange(selectedOrder.id, OrderStatus.READY)}
+                  >
+                    Mark Ready
+                  </button>
+                )}
+                {selectedOrder.status === "READY" && (
+                  <button
+                    className="btn-gold text-xs py-1 px-2.5"
+                    onClick={() => handleStatusChange(selectedOrder.id, OrderStatus.DELIVERED)}
+                  >
+                    Mark Delivered
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl p-3 border bg-slate-50 border-slate-200">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Description</p>
+              <p className="text-xs font-medium text-slate-600 mt-0.5">{selectedOrder.description}</p>
+            </div>
+
+            {/* Advance Receipts */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="section-title flex items-center gap-2">
+                  <Wallet size={16} style={{ color: "var(--gold-500)" }} />
+                  Advance Receipts
+                </h4>
+                {selectedOrder.balanceDue > 0 && (
+                  <button
+                    className="btn-gold text-xs py-1 px-3"
+                    onClick={() => setShowAdvanceModal(true)}
+                  >
+                    + Add Advance
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {advances
+                  .filter((a) => a.orderNumber === selectedOrder.orderNumber)
+                  .map((a) => (
+                    <div key={a.id} className="p-3 rounded-xl border flex items-center justify-between border-slate-200">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">{a.date}</p>
+                        <p className="text-[10px] text-slate-400">{a.method} {a.reference ? `· ${a.reference}` : ""}</p>
                       </div>
-                    ))}
-                  {advances.filter((a) => a.orderNumber === selectedOrder.orderNumber).length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-3">No advances received yet</p>
-                  )}
-                </div>
+                      <span className="text-sm font-bold text-emerald-700">{fmt(a.amount)}</span>
+                    </div>
+                  ))}
+                {advances.filter((a) => a.orderNumber === selectedOrder.orderNumber).length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-3">No advances received yet</p>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </SlideOver>
 
       {/* New Custom Order Modal */}
       {showNewOrderModal && (
@@ -628,126 +625,119 @@ function NewCustomOrderModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b bg-amber-50/60 border-amber-200">
-          <div className="flex items-center gap-2">
-            <Package size={18} className="text-amber-700" />
-            <h3 className="font-bold text-sm text-amber-900" style={{ fontFamily: "var(--font-display)" }}>
-              Create Bespoke Custom Order
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Create Bespoke Custom Order"
+      icon={<Package size={18} className="text-amber-700" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="input-label">Select Customer *</label>
+          <select
+            className="input"
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            required
+          >
+            <option value="">Select customer…</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.phone})
+              </option>
+            ))}
+          </select>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="input-label">Select Customer *</label>
-            <select
-              className="input"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            >
-              <option value="">Select customer…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.phone})
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label className="input-label">Jewellery Description *</label>
+          <textarea
+            className="input"
+            rows={3}
+            placeholder="e.g. 22K Gold Antique Choker with matching jhumkas — 45g target weight"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+          />
+        </div>
 
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="input-label">Jewellery Description *</label>
-            <textarea
-              className="input"
-              rows={3}
-              placeholder="e.g. 22K Gold Antique Choker with matching jhumkas — 45g target weight"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+            <label className="input-label">Estimated Order Value (₹) *</label>
+            <input
+              className="input font-bold text-amber-800"
+              type="number"
+              placeholder="350000"
+              value={estimatedAmount}
+              onChange={(e) => setEstimatedAmount(e.target.value)}
               required
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="input-label">Estimated Order Value (₹) *</label>
-              <input
-                className="input font-bold text-amber-800"
-                type="number"
-                placeholder="350000"
-                value={estimatedAmount}
-                onChange={(e) => setEstimatedAmount(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="input-label">Target Delivery Date</label>
-              <input
-                className="input"
-                type="date"
-                value={expectedDate}
-                onChange={(e) => setExpectedDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="input-label">Initial Advance Deposit (₹)</label>
-              <input
-                className="input font-bold text-emerald-800"
-                type="number"
-                placeholder="50000"
-                value={initialAdvance}
-                onChange={(e) => setInitialAdvance(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="input-label">Deposit Payment Mode</label>
-              <select
-                className="input"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              >
-                <option value="UPI">UPI</option>
-                <option value="CASH">Cash</option>
-                <option value="CARD">Card</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-              </select>
-            </div>
-          </div>
-
           <div>
-            <label className="input-label">Workshop / Karigar Notes</label>
+            <label className="input-label">Target Delivery Date</label>
             <input
               className="input"
-              placeholder="Design reference photo attached, stone color preferences…"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              type="date"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
             />
           </div>
+        </div>
 
-          {errorMsg && (
-            <div className="p-3 rounded-xl border flex items-start gap-2 bg-red-50 border-red-200">
-              <AlertCircle size={14} className="shrink-0 mt-0.5 text-red-600" />
-              <p className="text-xs font-medium text-red-700">{errorMsg}</p>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" className="btn-outline flex-1 justify-center" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-gold flex-1 justify-center" disabled={submitting}>
-              {submitting ? "Booking…" : "Book Custom Order"}
-            </button>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="input-label">Initial Advance Deposit (₹)</label>
+            <input
+              className="input font-bold text-emerald-800"
+              type="number"
+              placeholder="50000"
+              value={initialAdvance}
+              onChange={(e) => setInitialAdvance(e.target.value)}
+            />
           </div>
-        </form>
-      </div>
-    </div>
+          <div>
+            <label className="input-label">Deposit Payment Mode</label>
+            <select
+              className="input"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+            >
+              <option value="UPI">UPI</option>
+              <option value="CASH">Cash</option>
+              <option value="CARD">Card</option>
+              <option value="BANK_TRANSFER">Bank Transfer</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="input-label">Workshop / Karigar Notes</label>
+          <input
+            className="input"
+            placeholder="Design reference photo attached, stone color preferences…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+
+        {errorMsg && (
+          <div className="p-3 rounded-xl border flex items-start gap-2 bg-red-50 border-red-200">
+            <AlertCircle size={14} className="shrink-0 mt-0.5 text-red-600" />
+            <p className="text-xs font-medium text-red-700">{errorMsg}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" className="btn-outline flex-1 justify-center" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-gold flex-1 justify-center" disabled={submitting}>
+            {submitting ? "Booking…" : "Book Custom Order"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -816,79 +806,74 @@ function RecordAdvanceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ pointerEvents: "auto" }}>
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm mx-4 card p-0 overflow-hidden shadow-2xl animate-scale-in">
-        <div className="px-6 py-4 flex items-center justify-between border-b bg-emerald-50/60 border-emerald-200">
-          <div className="flex items-center gap-2">
-            <Wallet size={18} className="text-emerald-700" />
-            <h3 className="font-bold text-sm text-emerald-900" style={{ fontFamily: "var(--font-display)" }}>
-              Record Advance Deposit
-            </h3>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose}><X size={16} /></button>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Record Advance Deposit"
+      icon={<Wallet size={18} className="text-emerald-700" />}
+      maxWidth="max-w-sm"
+      headerBg="bg-emerald-50/70"
+      headerBorder="border-emerald-200"
+    >
+      <form onSubmit={handleDeposit} className="space-y-4">
+        <div>
+          <p className="text-xs text-slate-500 font-medium">Customer:</p>
+          <p className="text-sm font-bold text-slate-800">{order.customer}</p>
+          <p className="text-[11px] text-amber-700 font-bold mt-0.5">Order: {order.orderNumber}</p>
         </div>
 
-        <form onSubmit={handleDeposit} className="p-6 space-y-4">
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Customer:</p>
-            <p className="text-sm font-bold text-slate-800">{order.customer}</p>
-            <p className="text-[11px] text-amber-700 font-bold mt-0.5">Order: {order.orderNumber}</p>
-          </div>
+        <div>
+          <label className="input-label">Advance Deposit Amount (₹) *</label>
+          <input
+            className="input font-bold text-emerald-800"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          <p className="text-[10px] text-slate-400 mt-1">Order Balance Due: {fmt(order.balanceDue)}</p>
+        </div>
 
-          <div>
-            <label className="input-label">Advance Deposit Amount (₹) *</label>
-            <input
-              className="input font-bold text-emerald-800"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-            <p className="text-[10px] text-slate-400 mt-1">Order Balance Due: {fmt(order.balanceDue)}</p>
-          </div>
+        <div>
+          <label className="input-label">Payment Mode</label>
+          <select
+            className="input"
+            value={method}
+            onChange={(e) => setMethod(e.target.value as PaymentMethod)}
+          >
+            <option value="UPI">UPI</option>
+            <option value="CASH">Cash</option>
+            <option value="CARD">Card</option>
+            <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
+          </select>
+        </div>
 
-          <div>
-            <label className="input-label">Payment Mode</label>
-            <select
-              className="input"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-            >
-              <option value="UPI">UPI</option>
-              <option value="CASH">Cash</option>
-              <option value="CARD">Card</option>
-              <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
-            </select>
-          </div>
+        <div>
+          <label className="input-label">Reference / UTR / Cheque #</label>
+          <input
+            className="input"
+            placeholder="e.g. UPI-REF-90218"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+          />
+        </div>
 
-          <div>
-            <label className="input-label">Reference / UTR / Cheque #</label>
-            <input
-              className="input"
-              placeholder="e.g. UPI-REF-90218"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-            />
+        {errorMsg && (
+          <div className="p-3 rounded-xl border flex items-start gap-2 bg-red-50 border-red-200">
+            <AlertCircle size={14} className="shrink-0 mt-0.5 text-red-600" />
+            <p className="text-xs font-medium text-red-700">{errorMsg}</p>
           </div>
+        )}
 
-          {errorMsg && (
-            <div className="p-3 rounded-xl border flex items-start gap-2 bg-red-50 border-red-200">
-              <AlertCircle size={14} className="shrink-0 mt-0.5 text-red-600" />
-              <p className="text-xs font-medium text-red-700">{errorMsg}</p>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" className="btn-outline flex-1 justify-center" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-gold flex-1 justify-center" disabled={submitting}>
-              {submitting ? "Depositing…" : "Issue Advance Receipt"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-3 pt-2">
+          <button type="button" className="btn-outline flex-1 justify-center" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-gold flex-1 justify-center" disabled={submitting}>
+            {submitting ? "Depositing…" : "Issue Advance Receipt"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

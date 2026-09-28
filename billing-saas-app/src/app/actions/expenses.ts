@@ -37,7 +37,16 @@ export async function createExpenseAction(input: CreateExpenseActionInput) {
     revalidatePath("/reports");
     revalidatePath("/dashboard");
 
-    return { success: true, expense };
+    return {
+      success: true,
+      expense: {
+        id: expense.id,
+        description: expense.description,
+        amount: Number(expense.amount),
+        method: expense.method,
+        reference: expense.reference || "",
+      },
+    };
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to record expense." };
   }

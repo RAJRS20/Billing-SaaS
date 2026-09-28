@@ -99,7 +99,26 @@ export async function createProductAction(input: CreateProductInput) {
     revalidatePath("/billing");
     revalidatePath("/dashboard");
 
-    return { success: true, product };
+    return {
+      success: true,
+      product: {
+        id: product.id,
+        sku: product.sku,
+        barcode: product.barcode,
+        name: product.name,
+        categoryId: product.categoryId,
+        purityId: product.purityId,
+        metalId: product.metalId,
+        huid: product.huid,
+        grossWeight: Number(product.grossWeight),
+        stoneWeight: Number(product.stoneWeight),
+        netWeight: Number(product.netWeight),
+        makingChargeType: product.makingChargeType,
+        makingChargeValue: Number(product.makingChargeValue),
+        wastageValue: Number(product.wastageValue),
+        isActive: product.isActive,
+      },
+    };
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to create product." };
   }

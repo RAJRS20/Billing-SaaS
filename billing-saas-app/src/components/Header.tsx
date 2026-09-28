@@ -9,8 +9,39 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuToggle, mobileMenuOpen }: HeaderProps) {
-  const [goldRate] = useState("₹6,120/g");
+  const [goldRate, setGoldRate] = useState("₹6,672/g");
+  const [changePercent, setChangePercent] = useState("+0.8%");
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchLiveRate = async () => {
+    try {
+      const res = await fetch("/api/gold-rate");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.display22K) {
+          setGoldRate(data.display22K);
+          if (data.changePercent) setChangePercent(data.changePercent);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch live rate:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveRate();
+    const interval = setInterval(fetchLiveRate, 30000);
+
+    const onRateUpdated = () => {
+      fetchLiveRate();
+    };
+
+    window.addEventListener("gold-rate-updated", onRateUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("gold-rate-updated", onRateUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -79,7 +110,7 @@ export default function Header({ onMenuToggle, mobileMenuOpen }: HeaderProps) {
             className="text-[11px] font-bold px-1.5 py-0.5 rounded-md"
             style={{ background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" }}
           >
-            ↑ 0.8%
+            ↑ {changePercent.replace("+", "")}
           </span>
         </div>
 

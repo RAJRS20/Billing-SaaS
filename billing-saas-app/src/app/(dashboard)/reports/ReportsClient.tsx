@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   BarChart3, Scale, IndianRupee, TrendingUp,
   Download, CheckCircle2, AlertTriangle,
@@ -8,6 +9,7 @@ import {
   Lock, AlertCircle, Sparkles
 } from "lucide-react";
 import { recordPhysicalStockAuditAction } from "@/app/actions/reports";
+import Modal from "@/components/Modal";
 
 type ReportTab = "RECONCILIATION" | "SALES" | "INVENTORY" | "FINANCIAL" | "GST";
 
@@ -108,6 +110,11 @@ export default function ReportsClient({
   });
   const [reconcileSuccess, setReconcileSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Totals for Gold Reconciliation
   const reconTotals = useMemo(() => {
@@ -948,89 +955,77 @@ export default function ReportsClient({
       )}
 
       {/* ─── PHYSICAL AUDIT COUNT MODAL ────────────────────────────────────── */}
-      {showReconcileModal && (
-        <div className="modal-backdrop" onClick={() => setShowReconcileModal(false)}>
-          <div
-            className="modal-box max-w-lg p-6 rounded-2xl animate-fade-up bg-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <Scale className="text-amber-600" size={20} />
-                <h2 className="text-base font-bold text-slate-900">Record Physical Stock Audit</h2>
-              </div>
-              <button
-                onClick={() => setShowReconcileModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
+      <Modal
+        isOpen={showReconcileModal}
+        onClose={() => setShowReconcileModal(false)}
+        title="Record Physical Stock Audit"
+        icon={<Scale className="text-amber-600" size={20} />}
+        maxWidth="max-w-lg"
+      >
+        {reconcileSuccess ? (
+          <div className="py-8 text-center space-y-2">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+              <Check size={24} />
+            </div>
+            <h3 className="font-bold text-base text-slate-800">Audit Count Saved & Verified!</h3>
+            <p className="text-xs text-slate-500">
+              Gold reconciliation entries updated in the immutable audit ledger.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Place physical tray on the precision weighing scale and enter verified weights:
+            </p>
+
+            <div className="space-y-3">
+              {goldReconciliationData.map((row) => (
+                <div
+                  key={row.purity}
+                  className="p-3 rounded-lg border bg-slate-50 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">{row.purity}</p>
+                    <p className="text-[11px] text-slate-500">
+                      System Expected: {row.expectedClosingGrams.toFixed(2)}g
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={countInputs[row.purity] || ""}
+                      onChange={(e) =>
+                        setCountInputs({ ...countInputs, [row.purity]: e.target.value })
+                      }
+                      className="input text-xs font-bold text-right py-1 px-2 w-28 bg-white"
+                    />
+                    <span className="text-xs font-semibold text-slate-500">g</span>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {reconcileSuccess ? (
-              <div className="py-8 text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                  <Check size={24} />
-                </div>
-                <h3 className="font-bold text-base text-slate-800">Audit Count Saved & Verified!</h3>
-                <p className="text-xs text-slate-500">
-                  Gold reconciliation entries updated in the immutable audit ledger.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4 mt-4">
-                <p className="text-xs text-slate-500">
-                  Place physical tray on the precision weighing scale and enter verified weights:
-                </p>
-
-                <div className="space-y-3">
-                  {goldReconciliationData.map((row) => (
-                    <div
-                      key={row.purity}
-                      className="p-3 rounded-lg border bg-slate-50 flex items-center justify-between gap-3"
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-slate-800">{row.purity}</p>
-                        <p className="text-[11px] text-slate-500">
-                          System Expected: {row.expectedClosingGrams.toFixed(2)}g
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={countInputs[row.purity] || ""}
-                          onChange={(e) =>
-                            setCountInputs({ ...countInputs, [row.purity]: e.target.value })
-                          }
-                          className="input text-xs font-bold text-right py-1 px-2 w-28 bg-white"
-                        />
-                        <span className="text-xs font-semibold text-slate-500">g</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-3 border-t flex justify-end gap-2">
-                  <button
-                    onClick={() => setShowReconcileModal(false)}
-                    className="btn-outline text-xs px-4"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveAudit}
-                    disabled={isSubmitting}
-                    className="btn-gold text-xs px-4"
-                  >
-                    {isSubmitting ? "Saving..." : "Confirm & Reconcile"}
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="pt-3 border-t flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReconcileModal(false)}
+                className="btn-outline text-xs px-4"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAudit}
+                disabled={isSubmitting}
+                className="btn-gold text-xs px-4"
+              >
+                {isSubmitting ? "Saving..." : "Confirm & Reconcile"}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }
